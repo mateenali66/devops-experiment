@@ -1,0 +1,23 @@
+################################################################################
+# Sample GPU App ServiceMonitor
+# Enables Prometheus to scrape metrics from the application
+################################################################################
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: sample-gpu-app
+  namespace: gpu-workloads
+  labels:
+    app.kubernetes.io/name: sample-gpu-app
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sample-gpu-app
+  namespaceSelector:
+    matchNames:
+      - gpu-workloads
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s

@@ -1,0 +1,38 @@
+################################################################################
+# Sample GPU App - Production Overlay
+################################################################################
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: gpu-workloads
+
+resources:
+  - ../../base
+  - hpa.yaml
+  - pdb.yaml
+
+# Production-specific patches
+patches:
+  - target:
+      kind: Deployment
+      name: sample-gpu-app
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "512Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "1Gi"
+
+# Production-specific labels
+commonLabels:
+  environment: prod
+
+# Image configuration for prod (pinned version)
+images:
+  - name: sample-gpu-app
+    newName: ghcr.io/mateenali66/devops-experiment/sample-gpu-app
+    newTag: v1.0.0

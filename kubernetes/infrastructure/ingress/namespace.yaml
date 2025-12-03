@@ -1,0 +1,9 @@
+################################################################################
+# Ingress Nginx Namespace
+################################################################################
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+  labels:
+    toolkit.fluxcd.io/tenant: infrastructure

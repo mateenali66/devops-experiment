@@ -1,0 +1,40 @@
+################################################################################
+# Sample GPU App - Dev Overlay
+################################################################################
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: gpu-workloads
+
+resources:
+  - ../../base
+
+# Dev-specific patches
+patches:
+  - target:
+      kind: Deployment
+      name: sample-gpu-app
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/nvidia.com~1gpu
+        value: "0"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/nvidia.com~1gpu
+        value: "0"
+      - op: remove
+        path: /spec/template/spec/nodeSelector
+      - op: remove
+        path: /spec/template/spec/tolerations
+
+# Dev-specific labels
+commonLabels:
+  environment: dev
+
+# Image configuration for dev
+images:
+  - name: sample-gpu-app
+    newName: ghcr.io/mateenali66/devops-experiment/sample-gpu-app
+    newTag: latest

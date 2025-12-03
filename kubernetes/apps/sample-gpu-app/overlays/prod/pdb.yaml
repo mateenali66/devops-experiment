@@ -1,0 +1,13 @@
+################################################################################
+# Pod Disruption Budget for Production
+################################################################################
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: sample-gpu-app
+  namespace: gpu-workloads
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sample-gpu-app

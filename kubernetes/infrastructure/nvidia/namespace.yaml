@@ -1,0 +1,9 @@
+################################################################################
+# NVIDIA Device Plugin Namespace
+################################################################################
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nvidia-device-plugin
+  labels:
+    toolkit.fluxcd.io/tenant: infrastructure

@@ -1,0 +1,19 @@
+################################################################################
+# Sample GPU App Service
+################################################################################
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-gpu-app
+  namespace: gpu-workloads
+  labels:
+    app.kubernetes.io/name: sample-gpu-app
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: sample-gpu-app

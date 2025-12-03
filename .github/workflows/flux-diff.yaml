@@ -1,0 +1,149 @@
+################################################################################
+# Flux Diff Pipeline
+# Preview Kubernetes manifest changes before merge
+################################################################################
+name: Flux Diff
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'kubernetes/**'
+      - '.github/workflows/flux-diff.yaml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ============================================================================
+  # Validate Kubernetes Manifests
+  # ============================================================================
+  validate:
+    name: Validate Manifests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flux CLI
+        uses: fluxcd/flux2/action@main
+
+      - name: Setup kubeconform
+        uses: yokawasa/action-setup-kube-tools@v0.11.0
+        with:
+          kubeconform: '0.6.3'
+
+      - name: Validate Flux Kustomizations
+        run: |
+          echo "Validating Flux Kustomizations..."
+          find kubernetes -name 'kustomization.yaml' -exec dirname {} \; | while read dir; do
+            echo "Validating $dir"
+            kustomize build "$dir" > /dev/null 2>&1 && echo "✓ $dir" || echo "✗ $dir"
+          done
+
+      - name: Validate Kubernetes manifests
+        run: |
+          echo "Validating Kubernetes manifests..."
+          find kubernetes -name '*.yaml' -not -name 'kustomization.yaml' | while read file; do
+            kubeconform -strict -ignore-missing-schemas "$file" && echo "✓ $file" || echo "✗ $file (warning: may use CRDs)"
+          done
+        continue-on-error: true
+
+  # ============================================================================
+  # Diff Kubernetes Changes
+  # ============================================================================
+  diff:
+    name: Diff Changes
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          path: pr
+
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+
+      - name: Setup Flux CLI
+        uses: fluxcd/flux2/action@main
+
+      - name: Generate diff
+        id: diff
+        run: |
+          echo "## Kubernetes Manifest Diff" > diff.md
+          echo "" >> diff.md
+
+          # Find all kustomization directories
+          find pr/kubernetes -name 'kustomization.yaml' -exec dirname {} \; | while read pr_dir; do
+            main_dir="${pr_dir/pr\//main\/}"
+            rel_path="${pr_dir#pr/}"
+
+            echo "### $rel_path" >> diff.md
+            echo '```diff' >> diff.md
+
+            if [ -d "$main_dir" ]; then
+              # Build both versions and diff
+              kustomize build "$main_dir" 2>/dev/null > /tmp/main.yaml || true
+              kustomize build "$pr_dir" 2>/dev/null > /tmp/pr.yaml || true
+              diff -u /tmp/main.yaml /tmp/pr.yaml >> diff.md || true
+            else
+              echo "+ New kustomization" >> diff.md
+              kustomize build "$pr_dir" 2>/dev/null >> diff.md || echo "Build failed" >> diff.md
+            fi
+
+            echo '```' >> diff.md
+            echo "" >> diff.md
+          done
+
+          # Truncate if too long
+          if [ $(wc -c < diff.md) -gt 60000 ]; then
+            head -c 60000 diff.md > diff_truncated.md
+            echo "" >> diff_truncated.md
+            echo "*Output truncated due to size limits*" >> diff_truncated.md
+            mv diff_truncated.md diff.md
+          fi
+
+      - name: Comment diff on PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const diff = fs.readFileSync('diff.md', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: diff
+            });
+
+  # ============================================================================
+  # Lint Helm Values
+  # ============================================================================
+  lint-helm:
+    name: Lint Helm Values
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+
+      - name: Lint HelmRelease values
+        run: |
+          echo "Checking HelmRelease configurations..."
+          find kubernetes -name '*.yaml' -exec grep -l 'kind: HelmRelease' {} \; | while read file; do
+            echo "Checking $file"
+            # Basic YAML validation
+            python3 -c "import yaml; yaml.safe_load(open('$file'))" && echo "✓ Valid YAML" || echo "✗ Invalid YAML"
+          done

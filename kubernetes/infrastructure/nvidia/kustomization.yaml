@@ -1,0 +1,10 @@
+################################################################################
+# NVIDIA Device Plugin Kustomization
+################################################################################
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: nvidia-device-plugin
+resources:
+  - namespace.yaml
+  - device-plugin.yaml
+  - dcgm-exporter.yaml

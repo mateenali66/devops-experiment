@@ -1,0 +1,78 @@
+################################################################################
+# Ingress NGINX Controller
+################################################################################
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ingress-nginx
+  namespace: ingress-nginx
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: ingress-nginx
+      version: "4.x"
+      sourceRef:
+        kind: HelmRepository
+        name: ingress-nginx
+        namespace: flux-system
+      interval: 24h
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    controller:
+      # AWS NLB configuration
+      service:
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+          service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+          service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
+        externalTrafficPolicy: Local
+
+      # Replica count for HA
+      replicaCount: 2
+
+      # Resource limits
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+      # Enable Prometheus metrics
+      metrics:
+        enabled: true
+        serviceMonitor:
+          enabled: true
+          namespace: ingress-nginx
+
+      # Pod disruption budget
+      minAvailable: 1
+
+      # Affinity for spreading across zones
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - ingress-nginx
+                topologyKey: topology.kubernetes.io/zone
+
+      # Admission webhooks
+      admissionWebhooks:
+        enabled: true
+
+    # Default backend (optional)
+    defaultBackend:
+      enabled: false

@@ -1,0 +1,69 @@
+################################################################################
+# NVIDIA Device Plugin
+# Enables Kubernetes to schedule GPU workloads
+################################################################################
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: nvidia-device-plugin
+  namespace: nvidia-device-plugin
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: nvidia-device-plugin
+      version: "0.14.x"
+      sourceRef:
+        kind: HelmRepository
+        name: nvidia
+        namespace: flux-system
+      interval: 24h
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    # Only run on nodes with NVIDIA GPUs
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
+
+    # Tolerate GPU taints
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+
+    # Resource configuration
+    resources:
+      requests:
+        cpu: 50m
+        memory: 50Mi
+      limits:
+        cpu: 100m
+        memory: 100Mi
+
+    # Enable GPU sharing (optional)
+    config:
+      map:
+        default: |-
+          version: v1
+          sharing:
+            timeSlicing:
+              renameByDefault: false
+              failRequestsGreaterThanOne: false
+              resources:
+                - name: nvidia.com/gpu
+                  replicas: 1
+
+    # Affinity for GPU nodes
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: nvidia.com/gpu.present
+                  operator: In
+                  values:
+                    - "true"

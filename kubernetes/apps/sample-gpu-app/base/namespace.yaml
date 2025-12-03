@@ -1,0 +1,9 @@
+################################################################################
+# Sample GPU App Namespace
+################################################################################
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gpu-workloads
+  labels:
+    toolkit.fluxcd.io/tenant: apps

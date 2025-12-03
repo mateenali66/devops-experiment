@@ -1,0 +1,74 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+.terraform/
+.terraform.lock.hcl
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Terragrunt
+.terragrunt-cache/
+terragrunt-debug.tfvars.json
+
+# Local environment files
+.env
+.env.*
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Kubernetes
+kubeconfig
+*.kubeconfig
+
+# Flux (generated files - keep gotk-components.yaml and gotk-sync.yaml templates)
+# kubernetes/flux-system/gotk-components.yaml
+# kubernetes/flux-system/gotk-sync.yaml
+
+# Secrets
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+__pycache__/
+*.pyc
+*.pyo
+node_modules/
+
+# Test outputs
+coverage/
+*.coverage
+.pytest_cache/
+.nyc_output/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp

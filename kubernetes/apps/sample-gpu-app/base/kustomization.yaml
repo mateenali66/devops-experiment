@@ -1,0 +1,15 @@
+################################################################################
+# Sample GPU App - Base Kustomization
+################################################################################
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - deployment.yaml
+  - service.yaml
+  - servicemonitor.yaml
+
+commonLabels:
+  app.kubernetes.io/name: sample-gpu-app
+  app.kubernetes.io/component: gpu-workload

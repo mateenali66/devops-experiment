@@ -1,0 +1,111 @@
+################################################################################
+# Sample GPU App Deployment
+################################################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-gpu-app
+  namespace: gpu-workloads
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: sample-gpu-app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: sample-gpu-app
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Service account for IRSA if needed
+      serviceAccountName: sample-gpu-app
+
+      # Schedule on GPU nodes
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+
+      # Tolerate GPU node taints
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+
+      containers:
+        - name: app
+          image: sample-gpu-app:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: ENVIRONMENT
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: 500m
+              memory: 512Mi
+              nvidia.com/gpu: "1"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+      # Security context for pod
+      securityContext:
+        fsGroup: 1000
+
+      # Topology spread for high availability
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: sample-gpu-app
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sample-gpu-app
+  namespace: gpu-workloads
+  annotations:
+    # Add IRSA annotation if needed
+    # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/sample-gpu-app-role

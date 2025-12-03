@@ -1,0 +1,264 @@
+################################################################################
+# Terraform CI/CD Pipeline
+# Validates, plans, and applies infrastructure changes
+################################################################################
+name: Terraform CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+      - 'terragrunt/**'
+      - '.github/workflows/terraform-ci.yaml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+      - 'terragrunt/**'
+      - '.github/workflows/terraform-ci.yaml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+
+env:
+  TF_VERSION: '1.5.7'
+  TG_VERSION: '0.53.0'
+  AWS_REGION: 'us-west-2'
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ============================================================================
+  # Validate Terraform Configuration
+  # ============================================================================
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive -diff
+        working-directory: terraform
+
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+
+      - name: Init TFLint
+        run: tflint --init
+        working-directory: terraform
+
+      - name: Run TFLint
+        run: tflint --recursive --format=compact
+        working-directory: terraform
+
+  # ============================================================================
+  # Security Scanning
+  # ============================================================================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: 'terraform'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform
+          framework: terraform
+          output_format: sarif
+          output_file_path: checkov-results.sarif
+          soft_fail: true
+
+  # ============================================================================
+  # Terraform Plan (PR only)
+  # ============================================================================
+  plan:
+    name: Plan (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    needs: [validate, security]
+    if: github.event_name == 'pull_request' || github.event.inputs.action == 'plan'
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev]  # Add staging, prod as needed
+    environment: ${{ matrix.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Setup Terragrunt
+        uses: autero1/action-terragrunt@v1.3.2
+        with:
+          terragrunt_version: ${{ env.TG_VERSION }}
+
+      - name: Terragrunt Init
+        run: terragrunt run-all init --terragrunt-non-interactive
+        working-directory: terragrunt/${{ matrix.environment }}
+
+      - name: Terragrunt Plan
+        id: plan
+        run: |
+          terragrunt run-all plan -out=tfplan --terragrunt-non-interactive 2>&1 | tee plan.txt
+          echo "plan<<EOF" >> $GITHUB_OUTPUT
+          cat plan.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        working-directory: terragrunt/${{ matrix.environment }}
+        continue-on-error: true
+
+      - name: Comment Plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `#### Terraform Plan - \`${{ matrix.environment }}\` 📖
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`terraform
+            ${{ steps.plan.outputs.plan }}
+            \`\`\`
+
+            </details>
+
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  # ============================================================================
+  # Terraform Apply (main branch only)
+  # ============================================================================
+  apply:
+    name: Apply (${{ matrix.environment }})
+    runs-on: ubuntu-latest
+    needs: [validate, security]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event.inputs.action == 'apply')
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        environment: [dev]  # Add staging, prod with approval gates
+    environment:
+      name: ${{ matrix.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Setup Terragrunt
+        uses: autero1/action-terragrunt@v1.3.2
+        with:
+          terragrunt_version: ${{ env.TG_VERSION }}
+
+      - name: Terragrunt Init
+        run: terragrunt run-all init --terragrunt-non-interactive
+        working-directory: terragrunt/${{ matrix.environment }}
+
+      - name: Terragrunt Apply
+        run: terragrunt run-all apply --terragrunt-non-interactive -auto-approve
+        working-directory: terragrunt/${{ matrix.environment }}
+
+  # ============================================================================
+  # Cost Estimation (optional - requires Infracost)
+  # ============================================================================
+  cost:
+    name: Cost Estimation
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Infracost
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Generate Infracost JSON
+        run: |
+          infracost breakdown --path=terragrunt/dev \
+            --format=json \
+            --out-file=/tmp/infracost.json
+        continue-on-error: true
+
+      - name: Post Infracost comment
+        if: always()
+        uses: infracost/actions/comment@v1
+        with:
+          path: /tmp/infracost.json
+          behavior: update
+        continue-on-error: true
