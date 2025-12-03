@@ -4,6 +4,7 @@
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.28+-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
 [![AWS](https://img.shields.io/badge/AWS-EKS-FF9900?logo=amazon-aws)](https://aws.amazon.com/eks/)
 [![GPU](https://img.shields.io/badge/GPU-Ready-76B900?logo=nvidia)](https://developer.nvidia.com/)
+[![GitOps](https://img.shields.io/badge/GitOps-Flux-5468FF?logo=flux)](https://fluxcd.io/)
 
 A comprehensive, production-ready DevOps platform demonstrating Infrastructure as Code, GitOps, and modern cloud-native practices.
 
