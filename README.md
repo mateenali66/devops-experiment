@@ -1,5 +1,9 @@
 # DevOps Experiment - Production-Grade AWS EKS Platform
 
+[![Terraform](https://img.shields.io/badge/Terraform-1.5+-623CE4?logo=terraform)](https://www.terraform.io/)
+[![Kubernetes](https://img.shields.io/badge/Kubernetes-1.28+-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
+[![AWS](https://img.shields.io/badge/AWS-EKS-FF9900?logo=amazon-aws)](https://aws.amazon.com/eks/)
+
 A comprehensive, production-ready DevOps platform demonstrating Infrastructure as Code, GitOps, and modern cloud-native practices.
 
 **Last Updated:** December 2024
