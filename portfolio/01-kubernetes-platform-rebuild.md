@@ -19,55 +19,17 @@ The existing Kubernetes infrastructure had grown organically and suffered from:
 
 ## Architecture
 
-### Before: Legacy Setup
+### Before vs After
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Legacy Architecture                       │
-│                                                             │
-│  ┌──────────────┐     ┌──────────────┐                     │
-│  │  Manual      │     │   Single     │                     │
-│  │  kubectl     │────▶│   Cluster    │                     │
-│  │  Deployments │     │  (No IaC)    │                     │
-│  └──────────────┘     └──────────────┘                     │
-│         │                    │                              │
-│         │             ┌──────┴──────┐                      │
-│         │             │             │                      │
-│    No GitOps     No Autoscaling  Limited                   │
-│                                  Monitoring                 │
-└─────────────────────────────────────────────────────────────┘
-```
+**Before:** Manual kubectl deployments, single cluster with no IaC, no GitOps, limited monitoring.
 
-### After: Production-Grade Platform
+**After:** Production-grade platform with full automation:
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        Rebuilt Platform Architecture                         │
-│                                                                             │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────────────────────────┐ │
-│  │   GitHub    │    │   Flux CD   │    │         EKS Cluster             │ │
-│  │   (Source)  │───▶│  (GitOps)   │───▶│  ┌─────────────────────────┐   │ │
-│  └─────────────┘    └─────────────┘    │  │    Workload Namespaces  │   │ │
-│                                        │  │  ┌─────┐ ┌─────┐ ┌─────┐│   │ │
-│  ┌─────────────┐    ┌─────────────┐    │  │  │ App │ │ App │ │ App ││   │ │
-│  │ Terraform   │    │    S3 +     │    │  │  │  A  │ │  B  │ │  C  ││   │ │
-│  │ Terragrunt  │───▶│  DynamoDB   │    │  │  └─────┘ └─────┘ └─────┘│   │ │
-│  │   (IaC)     │    │  (State)    │    │  └─────────────────────────┘   │ │
-│  └─────────────┘    └─────────────┘    │                                 │ │
-│                                        │  ┌─────────────────────────┐   │ │
-│                                        │  │   Platform Services     │   │ │
-│  ┌─────────────────────────────────┐  │  │  ┌──────┐ ┌──────┐      │   │ │
-│  │        GitHub Actions           │  │  │  │Prom- │ │Grafana│     │   │ │
-│  │  ┌──────┐ ┌──────┐ ┌──────┐    │  │  │  │etheus│ │      │      │   │ │
-│  │  │Lint  │ │ Plan │ │Apply │    │  │  │  └──────┘ └──────┘      │   │ │
-│  │  └──────┘ └──────┘ └──────┘    │  │  │  ┌──────┐ ┌──────┐      │   │ │
-│  └─────────────────────────────────┘  │  │  │Ingress│ │Cert- │     │   │ │
-│                                        │  │  │ NGINX│ │Manager│     │   │ │
-│                                        │  │  └──────┘ └──────┘      │   │ │
-│                                        │  └─────────────────────────┘   │ │
-│                                        └─────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+![Platform Architecture](../diagrams/architecture.png)
+
+### GitOps Workflow
+
+![GitOps Flow](../diagrams/gitops_flow.png)
 
 ## Implementation
 
