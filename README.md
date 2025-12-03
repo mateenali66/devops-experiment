@@ -2,6 +2,8 @@
 
 A comprehensive, production-ready DevOps platform demonstrating Infrastructure as Code, GitOps, and modern cloud-native practices.
 
+**Last Updated:** December 2024
+
 ## 🏗️ Architecture Overview
 
 ```
